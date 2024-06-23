@@ -1,70 +1,84 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Message } from './models/Message';
 import * as amqp from 'amqplib';
 
 @Injectable()
-export class AppService {
-  
+export class AppService implements OnModuleInit, OnModuleDestroy {
   private connection: amqp.Connection;
   private channel: amqp.Channel;
 
   constructor(
     @InjectModel(Message)
     private readonly messageModel: typeof Message,
-  ) {
-    this.initialize();
+  ) {}
+
+  async onModuleInit() {
+    await this.initializeRabbitMQ();
   }
 
-  async initialize() {
-    try {
-      var amqp = require('amqplib/callback_api');
+  async onModuleDestroy() {
+    await this.closeRabbitMQ();
+  }
 
-      amqp.connect('amqp://localhost', function(error0, connection) {
-        if (error0) {
-          throw error0;
-        }
-        connection.createChannel(function(error1, channel) {
-          if (error1) {
-              throw error1;
-            }
-            var queue = 'hello';
-            var msg = 'Hello world';
-        
-            channel.assertQueue(queue, {
-              durable: false
-            });
-        
-            channel.sendToQueue(queue, Buffer.from(msg));
-            console.log(" [x] Sent %s", msg);
-        });
-      });
-      
+  private async initializeRabbitMQ() {
+    try {
+      this.connection = await amqp.connect('amqp://localhost');
+      this.channel = await this.connection.createChannel();
+
+      console.log('Conexão com RabbitMQ estabelecida com sucesso');
     } catch (error) {
-      console.error('Failed to connect to RabbitMQ', error);
+      console.error('Falha ao conectar ao RabbitMQ', error);
     }
   }
 
-  async enqueueMessage(message: { queue: string, message: string }): Promise<void> {
+  private async closeRabbitMQ() {
+    try {
+      if (this.channel) {
+        await this.channel.close(); // Fecha o canal
+        console.log('Canal RabbitMQ fechado');
+      }
+      if (this.connection) {
+        await this.connection.close(); // Fecha a conexão
+        console.log('Conexão RabbitMQ fechada');
+      }
+    } catch (error) {
+      console.error('Falha ao fechar a conexão com RabbitMQ', error);
+    }
+  }
+
+  public async enqueueMessage(message: { queue: string, message: string }): Promise<void> {
+    if (!this.channel) {
+      throw new Error('O canal RabbitMQ não está inicializado');
+    }
     try {
       await this.channel.assertQueue(message.queue, { durable: true });
       this.channel.sendToQueue(message.queue, Buffer.from(message.message), {
         persistent: true,
       });
-      console.log('Message sent to queue:', message.queue);
+      console.log('Mensagem enviada para a fila:', message.queue);
     } catch (error) {
-      console.error('Failed to send message to queue', error);
+      console.error('Falha ao enviar mensagem para a fila', error);
+      throw new Error('Falha ao enviar mensagem para a fila');
     }
   }
 
-  async storeMessageInHistory(userIdSend: string, userIdReceive: string, message: string): Promise<Message> {
-    
-    const newMessage = await this.messageModel.create({
-      userIdSend,
-      userIdReceive,
-      message,
-    });
-    return newMessage;
+  public async storeMessageInHistory(
+    user_id_send: string,
+    user_id_receive: string,
+    message: string,
+  ): Promise<Message> {
+    try {
+      const newMessage = await this.messageModel.create({
+        user_id_send,
+        user_id_receive,
+        message,
+      });
+      console.log('Mensagem armazenada no histórico:', newMessage);
+      return newMessage;
+    } catch (error) {
+      console.error('Falha ao armazenar mensagem no histórico', error);
+      throw new Error('Falha ao armazenar mensagem no histórico');
+    }
   }
-
 }

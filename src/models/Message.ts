@@ -6,7 +6,7 @@ import {
   PrimaryKey,
 } from 'sequelize-typescript';
 
-@Table
+@Table({ tableName: 'messages' }) // Especifica o nome da tabela
 export class Message extends Model {
   @PrimaryKey
   @AutoIncrement
@@ -18,4 +18,7 @@ export class Message extends Model {
 
   @Column
   user_id_receive: string;
+
+  @Column
+  message: string;
 }

@@ -25,9 +25,9 @@ export class AppController {
   @Post('message')
   public async receive_message(
     @Headers('Authorization') token: string,
-    @Body() body: { userIdSend: string, userIdReceive: string, message: string }) {
+    @Body() body: { user_id_send: string, user_id_receive: string, message: string }) {
 
-    const authApiResponse = await this.messageClient.verifyToken(token, body.userIdSend);
+    const authApiResponse = await this.messageClient.verifyToken(token, body.user_id_send);
 
     if (!authApiResponse) {
 
@@ -39,14 +39,14 @@ export class AppController {
 
     }
 
-    await this.appService.enqueueMessage({
-      queue: `${body.userIdSend}${body.userIdReceive}`,
-      message: body.message,
-    });
+      await this.appService.enqueueMessage({
+        queue: `${body.user_id_send}-${body.user_id_receive}`, // Ajuste no formato da fila para melhor leitura
+        message: body.message,
+      });
 
     await this.appService.storeMessageInHistory(
-      body.userIdSend,
-      body.userIdReceive,
+      body.user_id_send,
+      body.user_id_receive,
       body.message
     );
 

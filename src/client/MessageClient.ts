@@ -7,7 +7,7 @@ export class MessageClient {
   private token: string;
 
   private constructor() {
-    this.loginUrl = 'http://localhost:3005/';
+    this.loginUrl = 'http://authapi.lndo.site/api/';
   }
 
   public static getInstance() {
@@ -18,21 +18,19 @@ export class MessageClient {
     return MessageClient.instance;
   }
 
-  public async verifyToken(token, userId) {
-
+  public async verifyToken(token, userId: string) {
     try {
       const response = await axios.get(
-        `${this.loginUrl}?user=${userId}`,
+        `${this.loginUrl}token?user=${userId}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `${token}`,
           },
-        }
+        },
       );
 
       return response.data;
     } catch (error) {
-
       throw new HttpException('Failed to verify token', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
