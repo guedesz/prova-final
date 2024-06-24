@@ -11,7 +11,7 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectModel(Message)
     private readonly messageModel: typeof Message,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     await this.initializeRabbitMQ();
@@ -63,22 +63,89 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async storeMessageInHistory(
-    user_id_send: string,
-    user_id_receive: string,
-    message: string,
-  ): Promise<Message> {
+  public async processMessages(userIdSend, userIdReceive) {
+    // Lógica para consultar mensagens e registrar na tabela de mensagens
+    const channelId = `${userIdSend}${userIdReceive}`;
+
     try {
-      const newMessage = await this.messageModel.create({
-        user_id_send,
-        user_id_receive,
-        message,
-      });
-      console.log('Mensagem armazenada no histórico:', newMessage);
-      return newMessage;
+      // Recupera todas as mensagens do canal especificado
+      const messages = await this.fetchMessagesFromChannel(channelId);
+
+      // Salva as mensagens na tabela
+      await this.messageModel.bulkCreate(messages);
+
+      console.log('Mensagens processadas e salvas na tabela:', messages);
     } catch (error) {
-      console.error('Falha ao armazenar mensagem no histórico', error);
-      throw new Error('Falha ao armazenar mensagem no histórico');
+      console.error('Falha ao processar mensagens', error);
     }
   }
+
+  private async fetchMessagesFromChannel(channelId: string): Promise<any[]> {
+    if (!this.channel) {
+      throw new Error('O canal RabbitMQ não está inicializado');
+    }
+
+    try {
+      await this.channel.assertQueue(channelId, { durable: true });
+
+      const messages: any[] = [];
+
+      const consumeMessages = async (msg) => {
+        if (msg !== null) {
+          const messageContent = msg.content.toString();
+          messages.push({ channelId, message: messageContent });
+          this.channel.ack(msg);  // Confirma a mensagem como processada
+        }
+      };
+
+      await this.channel.consume(channelId, consumeMessages, { noAck: false });
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(messages);
+        }, 5000); // Aguarda 5 segundos para consumir as mensagens
+      });
+
+    } catch (error) {
+      console.error('Falha ao buscar mensagens do canal', error);
+      throw new Error('Falha ao buscar mensagens do canal');
+    }
+  }
+
+  public async consumeMessagesFromQueue(queue: string) {
+    if (!this.channel) {
+      throw new Error('O canal RabbitMQ não está inicializado');
+    }
+
+    try {
+      await this.channel.assertQueue(queue, { durable: true });
+
+      this.channel.consume(queue, async (msg) => {
+        if (msg !== null) {
+          const messageContent = msg.content.toString();
+          console.log('Mensagem recebida da fila:', messageContent);
+
+          // Processa a mensagem conforme necessário
+          // Aqui você pode fazer o parse do conteúdo e salvar na tabela, etc.
+          await this.processReceivedMessage(messageContent);
+
+          // Confirma a mensagem como processada
+          this.channel.ack(msg);
+        }
+      });
+
+      console.log('Consumidor de mensagens da fila iniciado:', queue);
+    } catch (error) {
+      console.error('Falha ao consumir mensagens da fila', error);
+    }
+  }
+
+  private async processReceivedMessage(messageContent: string) {
+    // Implementação simulada para processar a mensagem recebida
+    // Aqui você pode salvar na tabela, logar, etc.
+    console.log('Processando mensagem recebida:', messageContent);
+    // Exemplo de salvamento na tabela
+    await this.messageModel.create({ content: messageContent });
+  }
+
 }
