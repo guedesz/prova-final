@@ -88,8 +88,7 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
         // await this.messageModel.bulkCreate(messages);
         console.log('Mensagens:', messages);
 
-        return messages
-
+        return messages;
       } else {
         console.log('Nenhuma mensagem encontrada na fila:', channelId);
       }

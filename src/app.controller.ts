@@ -11,47 +11,6 @@ export class AppController {
   ) {
     this.messageClient = MessageClient.getInstance();
   }
-
-  
-  @Get('message')
-  public async read_message(
-    @Headers('Authorization') token: string,
-    @Query('user') userId: string,
-  ) {
-    const authApiResponse = await this.messageClient.verifyToken(token, userId);
-
-    if (!authApiResponse) {
-      return {
-        msg: 'not auth',
-      };
-    }
-
-    try {
-      const allUsers = await this.messageClient.getAllUsers(token);
-
-      const userMessages = await Promise.all(
-        allUsers.map(async (user: any) => {
-          const messages = await this.messageClient.getUserMessages(user.user_id);
-          return messages.map((msg: any) => ({
-            userId: user.name,
-            msg: msg.message,
-          }));
-        })
-      );
-
-      return {
-        msg: 'success',
-        users: userMessages.flat(),
-      };
-
-    } catch (error) {
-      console.error('Error processing users:', error);
-      return {
-        msg: 'error processing users',
-      };
-    }
-  }
-  
   @Post('message')
   public async receive_message(
     @Headers('Authorization') token: string,
@@ -106,8 +65,34 @@ export class AppController {
         message: 'Messages recorded with success',
       };
     }
+  }
 
+  @Get('message')
+  public async read_message(
+    @Headers('Authorization') token: string,
+    @Query('user') userId,
+  ) {
+    const authApiResponse = await this.messageClient.verifyToken(token, userId);
 
+    if (!authApiResponse) {
+      return {
+        msg: 'not auth',
+      };
+    }
+
+    try {
+      const messages = await this.messageClient.getUserMessages(userId);
+      return messages['data'].map((msg: any) => ({
+        userId: userId,
+        msg: msg.message,
+      }));
+
+    } catch (error) {
+      console.error('Error processing users:', error);
+      return {
+        msg: 'error processing users',
+      };
+    }
   }
 
 }

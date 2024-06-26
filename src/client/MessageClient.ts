@@ -43,7 +43,7 @@ export class MessageClient {
       const response = await axios.post(this.recordUrl, {
         userIdSend: userIdSend,
         userIdReceive: userIdReceive,
-        message: message
+        message: message.message
       });
       
       console.log('Message recorded successfully:', response.data);
@@ -52,9 +52,9 @@ export class MessageClient {
     }
   }
 
-  public async getUserMessages(userId: number) {
+  public async getUserMessages(userId: string) {
     try {
-      const response = await axios.get(`${this.loginUrl}messages?userId=${userId}`);
+      const response = await axios.get(`${this.recordUrl}?user=${userId}`);
       return response.data;
     } catch (error) {
       console.error(`Error getting messages for user ${userId}:`, error);
