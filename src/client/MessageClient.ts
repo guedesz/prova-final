@@ -52,6 +52,17 @@ export class MessageClient {
     }
   }
 
+  public async getUserMessages(userId: number) {
+    try {
+      const response = await axios.get(`${this.loginUrl}messages?userId=${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting messages for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  
   public async getAllUsers(token: string) {
 
     try {
