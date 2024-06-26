@@ -63,89 +63,44 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async processMessages(userIdSend, userIdReceive) {
+  public async processMessages(userIdSend: string, userIdReceive: string) {
     // Lógica para consultar mensagens e registrar na tabela de mensagens
     const channelId = `${userIdSend}${userIdReceive}`;
-
+  
     try {
-      // Recupera todas as mensagens do canal especificado
-      const messages = await this.fetchMessagesFromChannel(channelId);
-
-      // Salva as mensagens na tabela
-      await this.messageModel.bulkCreate(messages);
-
-      console.log('Mensagens processadas e salvas na tabela:', messages);
+      // Ensure RabbitMQ channel is initialized
+      if (!this.channel) {
+        throw new Error('O canal RabbitMQ não está inicializado');
+      }
+  
+      // Declare the queue with appropriate durability
+      await this.channel.assertQueue(channelId, { durable: true });
+  
+      // Consume messages using an asynchronous callback
+      const messages: any[] = [];
+      await this.channel.consume(channelId, async (msg) => {
+        if (msg !== null) {
+          const messageContent = msg.content.toString();
+          messages.push({ channelId, message: messageContent });
+  
+          // Acknowledge the message as processed after successful processing
+          await this.channel.ack(msg);
+        }
+      });
+  
+      // Wait for a reasonable timeout (adjust as needed) to allow messages to be consumed
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+  
+      // Process the collected messages (optional, depending on your use case)
+      if (messages.length > 0) {
+        await this.messageModel.bulkCreate(messages);
+        console.log('Mensagens processadas e salvas na tabela:', messages);
+      } else {
+        console.log('Nenhuma mensagem encontrada na fila:', channelId);
+      }
     } catch (error) {
       console.error('Falha ao processar mensagens', error);
     }
   }
-
-  private async fetchMessagesFromChannel(channelId: string): Promise<any[]> {
-    if (!this.channel) {
-      throw new Error('O canal RabbitMQ não está inicializado');
-    }
-
-    try {
-      await this.channel.assertQueue(channelId, { durable: true });
-
-      const messages: any[] = [];
-
-      const consumeMessages = async (msg) => {
-        if (msg !== null) {
-          const messageContent = msg.content.toString();
-          messages.push({ channelId, message: messageContent });
-          this.channel.ack(msg);  // Confirma a mensagem como processada
-        }
-      };
-
-      await this.channel.consume(channelId, consumeMessages, { noAck: false });
-
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(messages);
-        }, 5000); // Aguarda 5 segundos para consumir as mensagens
-      });
-
-    } catch (error) {
-      console.error('Falha ao buscar mensagens do canal', error);
-      throw new Error('Falha ao buscar mensagens do canal');
-    }
-  }
-
-  public async consumeMessagesFromQueue(queue: string) {
-    if (!this.channel) {
-      throw new Error('O canal RabbitMQ não está inicializado');
-    }
-
-    try {
-      await this.channel.assertQueue(queue, { durable: true });
-
-      this.channel.consume(queue, async (msg) => {
-        if (msg !== null) {
-          const messageContent = msg.content.toString();
-          console.log('Mensagem recebida da fila:', messageContent);
-
-          // Processa a mensagem conforme necessário
-          // Aqui você pode fazer o parse do conteúdo e salvar na tabela, etc.
-          await this.processReceivedMessage(messageContent);
-
-          // Confirma a mensagem como processada
-          this.channel.ack(msg);
-        }
-      });
-
-      console.log('Consumidor de mensagens da fila iniciado:', queue);
-    } catch (error) {
-      console.error('Falha ao consumir mensagens da fila', error);
-    }
-  }
-
-  private async processReceivedMessage(messageContent: string) {
-    // Implementação simulada para processar a mensagem recebida
-    // Aqui você pode salvar na tabela, logar, etc.
-    console.log('Processando mensagem recebida:', messageContent);
-    // Exemplo de salvamento na tabela
-    await this.messageModel.create({ content: messageContent });
-  }
-
+  
 }
