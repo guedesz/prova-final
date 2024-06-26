@@ -57,11 +57,15 @@ export class AppController {
 
     }
 
-    return await this.appService.processMessages(
+    const messages = await this.appService.processMessages(
       body.user_id_send,
       body.user_id_receive,
     );
     
+    messages.map(message => {
+      return this.messageClient.recordMessage(body.user_id_send, body.user_id_receive, message)
+    })
+
   }
 
 }
