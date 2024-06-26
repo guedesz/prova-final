@@ -30,7 +30,7 @@ export class AppController {
     }
 
     await this.appService.enqueueMessage({
-        queue: `${body.user_id_send}-${body.user_id_receive}`, // Ajuste no formato da fila para melhor leitura
+        queue: `${body.user_id_send}${body.user_id_receive}`, // Ajuste no formato da fila para melhor leitura
         message: body.message,
     });
     

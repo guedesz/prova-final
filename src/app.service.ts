@@ -64,37 +64,29 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
   }
 
   public async processMessages(userIdSend: string, userIdReceive: string) {
-    // Lógica para consultar mensagens e registrar na tabela de mensagens
     const channelId = `${userIdSend}${userIdReceive}`;
-  
+
     try {
-      // Ensure RabbitMQ channel is initialized
       if (!this.channel) {
         throw new Error('O canal RabbitMQ não está inicializado');
       }
-  
-      // Declare the queue with appropriate durability
+
       await this.channel.assertQueue(channelId, { durable: true });
-  
-      // Consume messages using an asynchronous callback
+
       const messages: any[] = [];
-      await this.channel.consume(channelId, async (msg) => {
-        if (msg !== null) {
-          const messageContent = msg.content.toString();
-          messages.push({ channelId, message: messageContent });
-  
-          // Acknowledge the message as processed after successful processing
-          await this.channel.ack(msg);
-        }
-      });
-  
-      // Wait for a reasonable timeout (adjust as needed) to allow messages to be consumed
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-  
-      // Process the collected messages (optional, depending on your use case)
+      let msg = await this.channel.get(channelId);
+      while (msg !== false) {
+        const messageContent = msg.content.toString();
+        messages.push({ channelId, message: messageContent });
+
+        await this.channel.ack(msg);
+
+        msg = await this.channel.get(channelId);
+      }
+
       if (messages.length > 0) {
-        await this.messageModel.bulkCreate(messages);
-        console.log('Mensagens processadas e salvas na tabela:', messages);
+        // await this.messageModel.bulkCreate(messages);
+        console.log('Mensagens:', messages);
       } else {
         console.log('Nenhuma mensagem encontrada na fila:', channelId);
       }
@@ -102,5 +94,4 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
       console.error('Falha ao processar mensagens', error);
     }
   }
-  
 }
