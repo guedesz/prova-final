@@ -52,4 +52,23 @@ export class MessageClient {
     }
   }
 
+  public async getAllUsers(token: string) {
+
+    try {
+
+      const response = await axios.get(
+        `${this.loginUrl}users`,
+        {
+          headers: {
+            Authorization: `${token}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Error recording message:', error);
+    }
+  }
+
 }

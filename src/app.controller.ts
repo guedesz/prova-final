@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Headers, Post, Body, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { MessageClient } from './client/MessageClient';
 import { AppService } from './app.service';
 
@@ -12,6 +12,27 @@ export class AppController {
     this.messageClient = MessageClient.getInstance();
   }
 
+  @Get('message')
+  public async read_message(
+    @Headers('Authorization') token: string,
+    @Query('user') userId: string
+  ) {
+
+    const authApiResponse = await this.messageClient.verifyToken(token, userId);
+
+    if (!authApiResponse) {
+      return {
+        msg: 'not auth'
+      }
+    }
+
+    const allUsers = await this.messageClient.getAllUsers(token)
+
+    allUsers.map(user => {
+      console.log(user)
+    })
+  }
+
   @Post('message')
   public async receive_message(
     @Headers('Authorization') token: string,
@@ -20,8 +41,6 @@ export class AppController {
     const authApiResponse = await this.messageClient.verifyToken(token, body.user_id_send);
 
     if (!authApiResponse) {
-
-      throw new HttpException('Not authenticated', HttpStatus.UNAUTHORIZED);
 
       return {
         msg: 'not auth'
@@ -48,13 +67,9 @@ export class AppController {
     const authApiResponse = await this.messageClient.verifyToken(token, body.user_id_send);
 
     if (!authApiResponse) {
-
-      throw new HttpException('Not authenticated', HttpStatus.UNAUTHORIZED);
-
       return {
         msg: 'not auth'
       }
-
     }
 
     const messages = await this.appService.processMessages(
@@ -62,9 +77,17 @@ export class AppController {
       body.user_id_receive,
     );
     
-    messages.map(message => {
-      return this.messageClient.recordMessage(body.user_id_send, body.user_id_receive, message)
-    })
+    if (messages.length > 0) {
+
+      messages.map(message => {
+        const response = this.messageClient.recordMessage(body.user_id_send, body.user_id_receive, message)
+      })
+
+      return {
+        message: 'Messages recorded with success',
+      };
+    }
+
 
   }
 
